@@ -1,0 +1,37 @@
+# FastAPI Backend Dependencies
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+pydantic==2.5.3
+pydantic-settings==2.1.0
+sqlalchemy==2.0.25
+alembic==1.13.1
+psycopg2-binary==2.9.9
+
+# AWS SDK
+boto3==1.34.34
+botocore==1.34.34
+
+# HTTP & Scraping
+httpx==0.26.0
+requests==2.31.0
+beautifulsoup4==4.12.2
+lxml==5.1.0
+
+# Cal AI Integration
+aiohttp==3.9.1
+
+# Utilities
+python-dotenv==1.0.0
+python-multipart==0.0.6
+pydantic[email]==2.5.3
+
+# Async & Background Jobs
+celery==5.3.4
+redis==5.0.1
+
+# Date/Time
+python-dateutil==2.8.2
+
+# Logging & Monitoring
+sentry-sdk[fastapi]==2.4.0
+
