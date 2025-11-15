@@ -26,9 +26,6 @@ class Settings(BaseSettings):
     # Database Configuration
     database_url: str
     
-    # Redis Configuration
-    redis_url: str = "redis://localhost:6379/0"
-    
     # API Configuration
     api_secret_key: str
     environment: str = "development"

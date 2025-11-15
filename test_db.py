@@ -3,25 +3,25 @@ import sys
 from app.config import settings
 
 try:
-    import psycopg2
+    from sqlalchemy import create_engine, text
+    from app.db.database import engine
     print("Testing database connection...")
     print(f"Database URL: {settings.database_url.split('@')[1] if '@' in settings.database_url else 'local'}")
     
-    conn = psycopg2.connect(settings.database_url)
+    conn = engine.connect()
     print("✓ Database connection successful!")
     
     # Test query
-    cursor = conn.cursor()
-    cursor.execute("SELECT version();")
-    version = cursor.fetchone()
+    result = conn.execute(text("SELECT version();"))
+    version = result.fetchone()
     print(f"PostgreSQL version: {version[0]}")
     
-    cursor.close()
     conn.close()
     print("✓ Connection closed successfully")
     
-except ImportError:
-    print("✗ psycopg2 not installed. Run: pip install psycopg2-binary")
+except ImportError as e:
+    print(f"✗ Import error: {e}")
+    print("Make sure virtual environment is activated and dependencies are installed")
     sys.exit(1)
 except Exception as e:
     print(f"✗ Database connection failed: {e}")
