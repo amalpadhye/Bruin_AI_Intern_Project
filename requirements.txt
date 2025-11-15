@@ -17,7 +17,8 @@ requests==2.31.0
 beautifulsoup4==4.12.2
 lxml==5.1.0
 
-# Cal AI Integration
+# OpenAI/ChatGPT Integration
+openai==1.12.0
 aiohttp==3.9.1
 
 # Utilities

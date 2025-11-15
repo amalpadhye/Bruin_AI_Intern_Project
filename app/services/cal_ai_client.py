@@ -13,6 +13,8 @@ class CalAIClient:
     def __init__(self):
         self.base_url = settings.cal_ai_base_url
         self.api_key = settings.cal_ai_api_key
+        if not self.api_key:
+            raise ValueError("Cal AI API key not configured. Set CAL_AI_API_KEY in .env file.")
         self.headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"

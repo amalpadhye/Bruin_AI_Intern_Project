@@ -1,7 +1,7 @@
 """FastAPI main application."""
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import scan, menus, uploads, admin
+from app.api import scan, menus, uploads, admin, scraper_bulk, store_scraped
 from app.config import settings
 
 app = FastAPI(
@@ -24,6 +24,8 @@ app.include_router(scan.router)
 app.include_router(menus.router)
 app.include_router(uploads.router)
 app.include_router(admin.router)
+app.include_router(scraper_bulk.router)
+app.include_router(store_scraped.router)
 
 
 @app.get("/")

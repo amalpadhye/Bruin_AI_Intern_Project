@@ -4,72 +4,82 @@ Backend API for ForkU - Food tracking and social app for UCLA students.
 
 ## Architecture
 
-- **Framework**: FastAPI (Python 3.12)
-- **Deployment**: AWS ECS Fargate
-- **Database**: Aurora PostgreSQL Serverless v2
+- **Framework**: FastAPI (Python 3.8+)
+- **Database**: PostgreSQL (Aurora Serverless v2 planned)
 - **Storage**: Amazon S3
-- **Cache**: Redis (ElastiCache)
-- **Scheduling**: EventBridge → ECS tasks
+- **AI**: OpenAI ChatGPT Vision API
+- **Deployment**: Local development (ECS Fargate planned)
 
-## Features
+## Current Features
 
-### Cal AI Integration
-- Food image analysis via Cal AI API
-- Response normalization
-- Discrepancy detection vs menu data
-- Confidence threshold validation
+### Food Image Analysis
+- **ChatGPT Vision integration**: Analyzes food images, identifies multiple foods
+- **Menu matching**: Matches foods to UCLA dining hall menu items
+- **Serving size estimation**: Estimates portion sizes and adjusts calories
+- **Calorie comparison**: Compares ChatGPT estimates vs menu calories
+- **Unmatched food handling**: Suggests food names and calories for items not on menu
+- **Detailed classification**: Shows what ChatGPT sees (description, visual features, ingredients)
 
 ### UCLA Menu Scraping
-- API-first approach (UCLA official API)
-- Web scraping fallback
-- Daily automated scraping via EventBridge
-- S3 storage for raw data
-- Postgres normalization pipeline
+- **Historical scraping**: Scrapes up to 90 days of menu data
+- **Bulk operations**: Scrape date ranges or recent days
+- **Database storage**: Automatically stores unique menu items
+- **Dining hall filtering**: Filter by specific dining halls
+- **API-first approach**: Uses UCLA official API when available
+- **Web scraping fallback**: Falls back to web scraping if API unavailable
 
-## Setup
+## Quick Start
 
-1. **Install dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
+See [STATUS.md](STATUS.md) for detailed setup instructions and current state.
 
-2. **Configure environment:**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your credentials
-   ```
+**Quick setup:**
+```bash
+# Install dependencies
+pip install -r requirements.txt
 
-3. **Required environment variables:**
-   - `CAL_AI_API_KEY`: Cal AI API key
-   - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`: AWS credentials
-   - `S3_BUCKET_RAW`, `S3_BUCKET_DERIVED`, `S3_BUCKET_MEDIA`: S3 bucket names
-   - `DATABASE_URL`: PostgreSQL connection string
-   - `API_SECRET_KEY`: Secret for admin endpoints
+# Create database
+createdb forku_db
 
-4. **Run locally:**
-   ```bash
-   uvicorn app.main:app --reload
-   ```
+# Run migrations
+alembic upgrade head
 
-5. **Run scraper task:**
-   ```bash
-   python -m app.tasks.scraper_task [YYYY-MM-DD]
-   ```
+# Scrape menu data
+python3 scripts/scrape_and_store.py 90
+
+# Start API
+uvicorn app.main:app --reload
+
+# Open test UI
+open test_ui.html
+```
+
+## Required Environment Variables
+
+- `OPENAI_API_KEY`: OpenAI API key for ChatGPT Vision
+- `DATABASE_URL`: PostgreSQL connection string (e.g., `postgresql://localhost:5432/forku_db`)
+- `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`: AWS credentials
+- `AWS_REGION`: AWS region (e.g., `us-east-2`)
+- `S3_BUCKET_RAW`, `S3_BUCKET_DERIVED`, `S3_BUCKET_MEDIA`: S3 bucket names
+- `API_SECRET_KEY`: Secret for admin endpoints
 
 ## API Endpoints
 
 ### Scan
-- `POST /scan` - Analyze food image with Cal AI
+- `POST /scan?dining_halls=name1,name2` - Analyze food image, match to menu items
 
 ### Menus
 - `GET /menus?date=YYYY-MM-DD&hall=name` - Get menu data
 - `GET /menus/items/{item_id}` - Get menu item details
 
+### Scraper
+- `POST /scraper/scrape-recent?days=N` - Scrape last N days (requires X-Secret header)
+- `POST /scraper/bulk-scrape?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD` - Scrape date range
+
 ### Uploads
 - `GET /uploads/presign?contentType=image/jpeg` - Get presigned S3 URL
 
 ### Admin
-- `POST /tasks/scrape-ucla?date=YYYY-MM-DD` - Trigger menu scraping (requires X-Secret header)
+- `POST /tasks/scrape-ucla?date=YYYY-MM-DD` - Trigger single-day scrape (requires X-Secret header)
 
 ## Deployment
 
@@ -84,21 +94,25 @@ docker build -t forku-backend .
 - Set up EventBridge rule for daily scraping
 - Configure ALB/API Gateway in front
 
-## Cal AI Integration
+## Key Components
 
-The Cal AI client (`app/services/cal_ai_client.py`) handles:
-- Image analysis via `/scan-image` endpoint
-- Response normalization to standard format
-- Discrepancy calculation vs menu data
-- Confidence threshold validation
+### ChatGPT Vision Service
+- Analyzes food images using OpenAI's GPT-4 Vision
+- Identifies multiple foods per image
+- Matches to menu items
+- Estimates serving sizes and calories
+- Provides suggestions for unmatched foods
 
-## UCLA Scraper
+### UCLA Scraper
+- **API-first**: Uses UCLA official API when available
+- **Web scraping fallback**: Scrapes from dining.ucla.edu if API unavailable
+- **Historical scraping**: Can scrape date ranges
+- **Database storage**: Automatically stores unique items
 
-The scraper (`app/services/ucla_scraper.py`) supports:
-1. **UCLA API** (if access granted): Official API endpoint
-2. **Web scraping fallback**: Scrapes from dining.ucla.edu JSON endpoints
-
-The scraper task (`app/tasks/scraper_task.py`) is designed to run as an ECS Fargate task triggered by EventBridge.
+### Database
+- **PostgreSQL**: Stores menu items with nutrition data
+- **Alembic**: Database migrations
+- **SQLAlchemy**: ORM for type-safe operations
 
 ## Project Structure
 
@@ -119,10 +133,16 @@ app/
     └── scraper_task.py     # ECS scraper task
 ```
 
+## Documentation
+
+- **[STATUS.md](STATUS.md)**: Current project status, what works, what doesn't, what needs to be done
+
 ## Notes
 
-- Cal AI API structure may vary - adjust `normalize_response()` based on actual API response
-- UCLA API access requires approval from MyUCLA IWE partners
-- Web scraping fallback may break if UCLA website structure changes
-- All S3 operations use presigned URLs for security
+- **ChatGPT Vision** is the primary food analysis method (Cal AI integration exists but unused)
+- **UCLA API** access requires approval from MyUCLA IWE partners
+- **Web scraping fallback** may break if UCLA website structure changes
+- **Nutrition data** extraction from menus is incomplete (most items have `calories = None`)
+- All **S3 operations** use presigned URLs for security
+- **CORS** currently allows all origins (change for production)
 

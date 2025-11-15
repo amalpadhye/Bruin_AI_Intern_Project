@@ -160,6 +160,8 @@ class UCLAScraper:
                                         "name": item.get('menuRowName'),
                                         "recipe_id": item.get('recipeId'),
                                         "ingredient_id": item.get('ingredientId'),
+                                        "recipeId": item.get('recipeId'),  # Also store as recipeId for compatibility
+                                        "ingredientId": item.get('ingredientId'),  # Also store as ingredientId
                                         "section": section.get('menuDayMealOptionName')
                                     }
                                     menu_data["dining_halls"][key].append(item_data)
@@ -180,6 +182,7 @@ class UCLAScraper:
     
     async def fetch_recipe_details(self, recipe_id: str) -> Optional[Dict[str, Any]]:
         """Fetch detailed recipe information including nutrition."""
+        # Try JSON endpoint first
         url = f'https://dining.ucla.edu/wp-content/uploads/jamix/recipes/{recipe_id}.json'
         
         try:
@@ -187,7 +190,16 @@ class UCLAScraper:
             if response.status_code == 200:
                 return self._extract_recipe_data(response.json())
         except Exception as e:
-            logger.error(f"Error fetching recipe {recipe_id}: {e}")
+            logger.debug(f"JSON recipe endpoint failed for {recipe_id}: {e}")
+        
+        # Fallback: Try scraping HTML page
+        try:
+            html_url = f'https://dining.ucla.edu/menu-item/?recipe={recipe_id}'
+            response = requests.get(html_url, timeout=10)
+            if response.status_code == 200:
+                return self._extract_recipe_data_from_html(response.text, recipe_id)
+        except Exception as e:
+            logger.debug(f"HTML recipe page failed for {recipe_id}: {e}")
         
         return None
     
@@ -243,6 +255,83 @@ class UCLAScraper:
             "nutrition": nutrition_info,
             "ingredients": ingredients
         }
+    
+    def _extract_recipe_data_from_html(self, html_content: str, recipe_id: str) -> Optional[Dict[str, Any]]:
+        """Extract nutrition data from HTML menu item page (e.g., /menu-item/?recipe=1193)."""
+        try:
+            soup = BeautifulSoup(html_content, 'html.parser')
+            nutrition_info = {}
+            ingredients = []
+            
+            # Try to find nutrition information in the page
+            # Look for nutrition facts section
+            nutrition_section = soup.find('div', class_=lambda x: x and ('nutrition' in str(x).lower() or 'calorie' in str(x).lower()))
+            
+            if nutrition_section:
+                # Try to extract calories
+                import re
+                text = nutrition_section.get_text()
+                
+                # Look for calories
+                cal_match = re.search(r'calories?[:\s]+(\d+)', text, re.IGNORECASE)
+                if cal_match:
+                    nutrition_info['calories'] = int(cal_match.group(1))
+                
+                # Look for protein
+                protein_match = re.search(r'protein[:\s]+(\d+\.?\d*)\s*g', text, re.IGNORECASE)
+                if protein_match:
+                    nutrition_info['protein_g'] = float(protein_match.group(1))
+                
+                # Look for fat
+                fat_match = re.search(r'fat[:\s]+(\d+\.?\d*)\s*g', text, re.IGNORECASE)
+                if fat_match:
+                    nutrition_info['fat_g'] = float(fat_match.group(1))
+                
+                # Look for carbs/carbohydrates
+                carbs_match = re.search(r'carbohydrates?[:\s]+(\d+\.?\d*)\s*g', text, re.IGNORECASE)
+                if carbs_match:
+                    nutrition_info['carbs_g'] = float(carbs_match.group(1))
+                
+                # Look for fiber
+                fiber_match = re.search(r'fiber[:\s]+(\d+\.?\d*)\s*g', text, re.IGNORECASE)
+                if fiber_match:
+                    nutrition_info['fiber_g'] = float(fiber_match.group(1))
+                
+                # Look for serving size
+                serving_match = re.search(r'serving\s+size[:\s]+(\d+\.?\d*)\s*(oz|ounce|cup|g|gram)', text, re.IGNORECASE)
+                if serving_match:
+                    nutrition_info['serving_size'] = f"{serving_match.group(1)} {serving_match.group(2)}"
+            
+            # Try to find ingredients
+            ingredients_section = soup.find('div', class_=lambda x: x and 'ingredient' in str(x).lower()) or \
+                                soup.find('ul', class_=lambda x: x and 'ingredient' in str(x).lower()) or \
+                                soup.find('section', class_=lambda x: x and 'ingredient' in str(x).lower())
+            
+            if ingredients_section:
+                ingredient_items = ingredients_section.find_all('li')
+                if ingredient_items:
+                    ingredients = [item.get_text(strip=True) for item in ingredient_items]
+                else:
+                    # Try to extract from text
+                    ing_text = ingredients_section.get_text()
+                    if ',' in ing_text:
+                        ingredients = [ing.strip() for ing in ing_text.split(',')]
+            
+            # Try to find item name
+            name_elem = soup.find('h1') or soup.find('h2', class_=lambda x: x and 'recipe' in str(x).lower())
+            name_text = name_elem.get_text(strip=True) if name_elem else 'Unknown'
+            
+            if nutrition_info:
+                return {
+                    "name": name_text,
+                    "nutrition": nutrition_info,
+                    "ingredients": ingredients if ingredients else None
+                }
+            
+        except Exception as e:
+            logger.error(f"Error parsing HTML for recipe {recipe_id}: {e}")
+        
+        return None
     
     def _extract_ingredient_data(self, ingredient_json: Dict[str, Any]) -> Dict[str, Any]:
         """Extract nutrition info from ingredient JSON."""

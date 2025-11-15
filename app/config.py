@@ -6,12 +6,17 @@ from typing import Optional
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
     
-    # Cal AI Configuration
-    cal_ai_api_key: str
+    # OpenAI/ChatGPT Configuration
+    openai_api_key: Optional[str] = None
+    
+    # Cal AI Configuration (optional - can be added later)
+    cal_ai_api_key: Optional[str] = None
     cal_ai_base_url: str = "https://api.calai.app"
     
     # AWS Configuration
-    aws_region: str = "us-west-2"
+    # Use us-east-2 (Ohio) or us-west-2 (Oregon) - both work fine from CA
+    # Important: Use the SAME region for all AWS resources (S3, ECS, etc.)
+    aws_region: str = "us-east-2"  # Using us-east-2 (Ohio)
     aws_access_key_id: Optional[str] = None
     aws_secret_access_key: Optional[str] = None
     s3_bucket_raw: str
@@ -40,6 +45,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = False
+        extra = "ignore"  # Ignore extra fields in .env that aren't in this class
 
 
 settings = Settings()
